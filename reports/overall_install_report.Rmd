@@ -1,0 +1,86 @@
+---
+title: "Product Statistics"
+author: "Michael Sousa"
+date: "`r format(Sys.Date(), '%Y %B %d')`"
+output: html_document
+---
+
+```{r cache=T, echo=FALSE, message=FALSE}
+library(ggplot2)
+#change wd to db folder and connect
+source('../init.R')
+setwd(paste0(root,'db_local'))
+con <- dbConnect(SQLite(), dbname='ecobase.sqlite')
+
+# SQL Query is a join between product_type, product_sub_type, product, program_product_price,
+# program, customer_product, customers, and installation_scheduler
+
+sql <- '
+SELECT DISTINCT product_type.ProductType, product_sub_type.ProductSubType, product.Product, program.Name, customer_product.ModelNo, customer_product.SerialNo, customer_product.ApplicationNumber, customers.Code, customer_product.Price, customer_product.funded, customer_product.Type, customer_product.CustomerProductStatus, customers.FirstName, customers.LastName, installation_scheduler.Date
+FROM product_type, product_sub_type, product, program_product_price, program, customer_product, customers, installation_scheduler
+WHERE product_type.Id = product_sub_type.ProductTypeId AND product_sub_type.Id = product.ProductSubType AND program_product_price.ProductId=product.Id AND program.Id = program_product_price.ProgramId AND program_product_price.ProgramId = customer_product.ProgramId AND program_product_price.ProductId = customer_product.ProductId AND customers.CustomerId = customer_product.CustomerId AND installation_scheduler.ApplicationNumberId = customer_product.CustomerProductDescriptionId;
+'
+
+req <- dbGetQuery(con,sql)
+
+#fix Dates
+req[,'Date'] <- as.POSIXct(req[,'Date'], tz = "EST", origin='1970-01-01')
+
+# subset to installed only
+req <- req[req$CustomerProductStatus=="INCompleted",]
+
+# remove Roll Back WH
+req <- req[req$ProductType != 'Roll Back WH',]
+req <- req[req$ProductType != 'Accessories',]
+
+#fix names
+names(req)[c(4,8,10,11,12,15)] <- c('ProgramName','Cx.Id','Funded','Owned','Status','InstallDate')
+
+```
+
+BREAKDOWN OF PRODUCTS
+---
+
+```{r cache=TRUE, echo=FALSE}
+# code
+prodtypes <- unique(req$ProductType)
+prodtype_table <- as.data.frame(table(req$ProductType))
+names(prodtype_table) <- c('Product Type','Count')
+
+#display
+prodtype_table
+```
+
+*Accessories typically include Thermostats and Humidifiers.
+
+CURRENT FUNDING STATUS
+---
+
+```{r cache=FALSE, echo=FALSE}
+x <- table(req$Funded,req$ProductType)
+x
+```
+*1 means funded, 0 means unfunded*
+
+FUNDING RATE
+---
+
+```{r cache=FALSE, echo=FALSE}
+round(x[2,]/(x[1,]+x[2,]),2)*100
+
+```
+
+*Please ignore Builder Equipment while I work out some bugs*
+
+INSTALL VOLUME
+---
+```{r cache=TRUE, echo=FALSE, fig.width=12,fig.height=6}
+InstallDate <- as.character(cut.POSIXt(req$InstallDate,'month'))
+ProductType <- req$ProductType
+g <- data.frame(cbind(InstallDate,ProductType))
+
+ggplot(g, aes(x=InstallDate, fill=ProductType))+ geom_bar(stat='bin') + scale_fill_manual(values=c('skyblue3','darkolivegreen3','orangered3','cyan3'))
+
+```
+
+*Note that it is currently `r Sys.Date()` and the month is not fully complete*

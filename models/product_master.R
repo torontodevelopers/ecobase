@@ -3,7 +3,6 @@
 setwd(paste0(root,'db_local'))
 con <- dbConnect(SQLite(), dbname='ecobase.sqlite')
 
-dbListTables(con)
 # products
 product_type <- dbReadTable(con,'product_type')
 product_sub_type <- dbReadTable(con,'product_sub_type')
