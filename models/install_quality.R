@@ -6,13 +6,20 @@ con <- dbConnect(SQLite(), dbname='ecobase.sqlite')
 # read in tables of interest
 tech <- dbReadTable(con, 'technician')
 tech <- unique(tech)
+
 swoscheduler <- dbReadTable(con, 'service_work_order_scheduler')
 swoscheduler <- swoscheduler[swoscheduler$Status=="SWOCompleted",]
 install <- dbReadTable(con, 'installation_scheduler')
 install <- install[install$Status=="INCompleted",]
 install <- merge(install,tech,by.x="TechnicianId",by.y="Technicianid")[c(1,11)]
 
+swoproddetails <- dbReadTable(con, 'service_work_order_product_details')
+
 # SQL query to create original tech id and cx id table
+
+
+sql <- '
+SELECT installation_scheduler.TechnicianId AS original_tech, customer_product.CustomerId AS cx_id'
 
 sql <- 'SELECT installation_scheduler.TechnicianId, customer_product.CustomerId
 FROM installation_scheduler
@@ -38,6 +45,5 @@ ins.qual <- ins.qual[order(ins.qual$Freq),]
 
 setwd(paste0(root,'results/'))
 write.csv(ins.qual,'Install Quality-2.csv',row.names = F)
-
 
 dbDisconnect(con)
