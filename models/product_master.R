@@ -1,5 +1,5 @@
 # Create Product Detail Report
-
+source('../init.R')
 setwd(paste0(root,'db_local'))
 con <- dbConnect(SQLite(), dbname='ecobase.sqlite')
 

@@ -5,8 +5,7 @@ library(httr)
 library(jsonlite)
 library(RSQLite)
 library(ggplot2)
-
-setwd('../')
+library(gdata)
 
 #get all credentials from config file
 config <- yaml.load_file(input='config.yaml')
