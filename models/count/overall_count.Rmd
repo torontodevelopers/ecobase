@@ -1,0 +1,115 @@
+---
+title: "Overall Count"
+author: "Michael Sousa"
+date: "`r format(Sys.Date(), '%Y %B %d')`"
+output: html_document
+---
+
+```{r echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+#change wd to db folder and connect
+setwd('../../')
+source('init.R')
+setwd(paste0(root,'db_local'))
+con <- dbConnect(SQLite(), dbname='ecobase.sqlite')
+
+sql <- '
+SELECT DISTINCT product_type.ProductType, product_sub_type.ProductSubType, product.Product, program.Name, customer_product.ModelNo, customer_product.SerialNo, customer_product.ApplicationNumber, customers.Code, customers.Territory, customers.OBAReferenceNumber, customer_product.Price, customer_product.funded, customer_product.Type, customer_product.CustomerProductStatus, customers.FirstName, customers.LastName, installation_scheduler.Date
+FROM product_type, product_sub_type, product, program_product_price, program, customer_product, customers, installation_scheduler
+WHERE product_type.Id = product_sub_type.ProductTypeId AND product_sub_type.Id = product.ProductSubType AND program_product_price.ProductId=product.Id AND program.Id = program_product_price.ProgramId AND program_product_price.ProgramId = customer_product.ProgramId AND program_product_price.ProductId = customer_product.ProductId AND customers.CustomerId = customer_product.CustomerId AND installation_scheduler.ApplicationNumberId = customer_product.CustomerProductDescriptionId;
+'
+
+req <- dbGetQuery(con,sql)
+
+#fix Dates
+req[,'Date'] <- as.POSIXct(req[,'Date'], tz = "EST", origin='1970-01-01')
+
+# subset to installed only
+req <- req[req$CustomerProductStatus=="INCompleted",]
+cxprodbyterritory <- table(req$ProductType,req$Territory)
+noacc <- req[!req$ProductType=="Accessories",]
+
+
+# Enbridge Customer Products
+egd.cxprod <- noacc[noacc$Territory=='Enbridge',]
+
+egd.woba <- egd.cxprod[!egd.cxprod$OBAReferenceNumber=='',]
+egd.woba[,length(names(egd.woba))+1] <- 'With OBA'
+egd.wooba <- egd.cxprod[egd.cxprod$OBAReferenceNumber=='',]
+egd.wooba[,length(names(egd.wooba))+1] <- 'No OBA'
+
+egd.cxprod <- rbind(egd.woba,egd.wooba)
+names(egd.cxprod)[length(names(egd.cxprod))] <- 'OBAPresent'
+
+egd.cxprod.byoba <- table(egd.cxprod$ProductType,egd.cxprod$OBAPresent)
+
+# Count of CX with OBA and with NO OBA
+egd.cx.count.woba <- length(unique(egd.woba$OBAReferenceNumber)) # number of EGD CX with OBA
+egd.cx.count.wooba <- length(unique(egd.wooba$Code)) # number of EGD CX without OBA
+
+egd.cxprod.byfunded <- table(egd.cxprod$ProductType,egd.cxprod$funded)
+
+
+# Union Customer Products
+union.cxprod <- noacc[noacc$Territory=='Union',]
+union.cx.count <- length(unique(union.cxprod$Code))
+
+```
+
+```{r echo=FALSE, cache=TRUE}
+# Funded Breakdown
+noacc.funded.df <- table(noacc$ProductType,noacc$funded)
+
+funded.byunit <- (noacc.funded.df[,2]/(noacc.funded.df[,1]+noacc.funded.df[,2]))*100
+funded <- noacc[noacc$funded == 1,]
+# Unfunded
+unfunded <- noacc[noacc$funded == 0,]
+unfunded.aged <- table(cut.POSIXt(unfunded$Date,'month'),unfunded$ProductType)
+
+x <- table(cut.POSIXt(unfunded$Date,'month'),unfunded$ProductType)
+y <- table(cut.POSIXt(funded$Date,'month'),funded$ProductType)
+
+funded.percetnage.aged <- y/(x[1:12,c(1,3,5)]+y)
+
+```
+
+Customers
+---
+
+* Enbridge: `r egd.cx.count.woba + egd.cx.count.wooba`
+* Union: `r union.cx.count`
+
+Units by Territory
+----
+```{r cache=TRUE, echo=FALSE}
+cxprodbyterritory
+```
+
+EGD Units by OBA
+---
+```{r, echo=FALSE}
+egd.cxprod.byoba
+```
+
+EGD Units by Funded
+---
+```{r, echo=FALSE,}
+egd.cxprod.byfunded
+```
+
+Funding Percentage By Unit Type
+---
+```{r, echo=FALSE,}
+funded.byunit
+```
+
+Unfunded Units By Unit Type and Date Installed
+---
+```{r, echo=FALSE,}
+unfunded.aged
+```
+
+Funded Unit Percentages By Unit Type and Date Installed
+---
+```{r, echo=FALSE,}
+funded.percetnage.aged
+```

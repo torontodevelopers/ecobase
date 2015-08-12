@@ -1,0 +1,10 @@
+base
+reco
+yaml
+httr
+jsonlite
+DBI
+RSQLite
+ggplot2
+gdata
+lubridate

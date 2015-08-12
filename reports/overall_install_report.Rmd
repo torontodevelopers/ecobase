@@ -8,15 +8,13 @@ output: html_document
 ```{r cache=T, echo=FALSE, message=FALSE}
 library(ggplot2)
 #change wd to db folder and connect
-source('../init.R')
+setwd('../../')
+source('init.R')
 setwd(paste0(root,'db_local'))
 con <- dbConnect(SQLite(), dbname='ecobase.sqlite')
 
-# SQL Query is a join between product_type, product_sub_type, product, program_product_price,
-# program, customer_product, customers, and installation_scheduler
-
 sql <- '
-SELECT DISTINCT product_type.ProductType, product_sub_type.ProductSubType, product.Product, program.Name, customer_product.ModelNo, customer_product.SerialNo, customer_product.ApplicationNumber, customers.Code, customer_product.Price, customer_product.funded, customer_product.Type, customer_product.CustomerProductStatus, customers.FirstName, customers.LastName, installation_scheduler.Date
+SELECT DISTINCT product_type.ProductType, product_sub_type.ProductSubType, product.Product, program.Name, customer_product.ModelNo, customer_product.SerialNo, customer_product.ApplicationNumber, customers.Code, customers.Territory, customers.OBAReferenceNumber, customer_product.Price, customer_product.funded, customer_product.Type, customer_product.CustomerProductStatus, customers.FirstName, customers.LastName, installation_scheduler.Date
 FROM product_type, product_sub_type, product, program_product_price, program, customer_product, customers, installation_scheduler
 WHERE product_type.Id = product_sub_type.ProductTypeId AND product_sub_type.Id = product.ProductSubType AND program_product_price.ProductId=product.Id AND program.Id = program_product_price.ProgramId AND program_product_price.ProgramId = customer_product.ProgramId AND program_product_price.ProductId = customer_product.ProductId AND customers.CustomerId = customer_product.CustomerId AND installation_scheduler.ApplicationNumberId = customer_product.CustomerProductDescriptionId;
 '
@@ -28,6 +26,36 @@ req[,'Date'] <- as.POSIXct(req[,'Date'], tz = "EST", origin='1970-01-01')
 
 # subset to installed only
 req <- req[req$CustomerProductStatus=="INCompleted",]
+req <- req[!req$ProductType=="Accesories",]
+
+# Enbridge Customer Products
+egd.cxprod <- req[req$Territory=='Enbridge',]
+oba <- unique(egd.cxprod$OBAReferenceNumber)
+egd.woba <- egd.cxprod[!egd.cxprod$OBAReferenceNumber=='',]
+egd.wooba <- egd.cxprod[egd.cxprod$OBAReferenceNumber=='',]
+
+#cx with oba
+cx.woba <- unique(egd.woba$OBAReferenceNumber)
+
+#cx without oba
+cx.wooba <- egd.wooba[duplicated(egd.wooba$Code),]
+
+
+cx.code.wooba <- unique(egd.wooba$Code)
+cx.wooba <- egd.wooba[cx.code.wooba,]
+
+
+
+
+
+# Union Customer Products
+union.cxprod <- req[req$Territory=='Union',]
+
+
+
+egd.cx.OBA <- unique(req$OBAReferenceNumber)
+egd.cx.count <- 
+
 
 # remove Roll Back WH
 req <- req[req$ProductType != 'Roll Back WH',]

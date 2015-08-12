@@ -1,0 +1,61 @@
+---
+title: "Sales"
+author: "Michael Sousa"
+date: "`r format(Sys.Date(), '%Y %B %d')`"
+output: html_document
+---
+
+This Document will provide up to date Sales statistics.
+
+```{r echo=FALSE, cache=TRUE, message=FALSE, warning=FALSE}
+#change wd to db folder and connect
+setwd('../../')
+source('init.R')
+setwd(paste0(root,'db_local'))
+con <- dbConnect(SQLite(), dbname='ecobase.sqlite')
+dbListTables(con)
+
+customers <- dbReadTable(con,'customers')
+customer_product <- dbReadTable(con,'customer_product')
+
+product_type <- dbReadTable(con,'product_type')
+product_sub_type <- dbReadTable(con,'product_sub_type')
+product <- dbReadTable(con,'product')
+
+agents <- dbReadTable(con,'agents')
+
+pre_inspection_scheduler <- dbReadTable(con,'pre_inspection_scheduler')
+installation_scheduler <- dbReadTable(con,'installation_scheduler')
+
+
+tablenames <- dbListTables(con)
+fieldnames <- c()
+for (i in 1:length(tablenames)) {
+    fieldnames <- c(fieldnames,dbListFields(con,tablenames[i]))
+}
+
+dbListTables(con)
+
+agent_group_details <- dbReadTable(con,'agent_group_details')
+agents <- dbReadTable(con,'agents')
+pre_inspection_scheduler <- dbReadTable(con,'pre_inspection_scheduler')
+settlement_commission_details <- dbReadTable(con, 'settlement_commission_details')
+
+
+sql <- '
+SELECT DISTINCT product_type.ProductType, product_sub_type.ProductSubType, product.Product, program.Name, customer_product.ModelNo, customer_product.SerialNo, customer_product.ApplicationNumber, customers.Code, customers.Territory, customers.OBAReferenceNumber, customer_product.Price, customer_product.funded, customer_product.Type, customer_product.CustomerProductStatus, customers.FirstName, customers.LastName, installation_scheduler.Date, customers.LeadBooker
+FROM product_type, product_sub_type, product, program_product_price, program, customer_product, customers, installation_scheduler
+WHERE product_type.Id = product_sub_type.ProductTypeId AND product_sub_type.Id = product.ProductSubType AND program_product_price.ProductId=product.Id AND program.Id = program_product_price.ProgramId AND program_product_price.ProgramId = customer_product.ProgramId AND program_product_price.ProductId = customer_product.ProductId AND customers.CustomerId = customer_product.CustomerId AND installation_scheduler.ApplicationNumberId = customer_product.CustomerProductDescriptionId;
+'
+
+req <- dbGetQuery(con,sql)
+
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
